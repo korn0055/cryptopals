@@ -6,7 +6,7 @@ if __name__ == "__main__":
         for i, text in enumerate(f):
             ciphertext = bytes.fromhex(text)
             scores = enumerate(single_byte_xor_cipher.score_over_keyspace(ciphertext))
-            top_scores = tuple(filter(lambda x: x[1] > 4, scores))
+            top_scores = tuple(filter(lambda x: x[1] > 100, scores))
             for top in top_scores:
                 key = top[0]
                 decrypted = single_byte_xor_cipher.decrypt(ciphertext, key)
