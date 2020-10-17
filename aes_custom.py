@@ -48,6 +48,8 @@ def test_ecb2():
 def pad_pkcs7(bytestring, block_size=16):
     # should block be added if it's an even multiple of block_size?
     pad_value = bytes([block_size - (len(bytestring) % block_size)])
+    if pad_value == 0:
+        pad_value = block_size
     output_block_count = math.ceil(len(bytestring)/block_size)
     return bytestring.ljust(output_block_count*block_size, pad_value)
 
