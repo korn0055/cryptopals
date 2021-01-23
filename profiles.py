@@ -36,11 +36,34 @@ def decrypt_profile(ciphertext : bytes):
 
 def crack_admin(oracle_fn):
 
-    ciphertext, _ = oracle_fn("bla@thisisntit.com")
+    # get the oracle to encrypt a block that only include 'admin' + padding
+    # this block will be pasted to the end of the ciphertext that includes the attacker email
+    offset = 16 - len('email=')
+    padded_admin_pt = aes_custom.pad_pkcs7('admin'.encode('ascii')).decode('ascii')
+    offset_padded_admin_pt = 'x'*offset + padded_admin_pt
+    print(f"offset_padded_admin_pt={offset_padded_admin_pt}, len={len(offset_padded_admin_pt)}")
+    admin_block_ct, _ = oracle_fn(offset_padded_admin_pt)
+    print(f"admin_block_ct={admin_block_ct}, len={len(admin_block_ct)}")
+    admin_plus_pad_ct = admin_block_ct[16:32]
+    print(f"admin_plus_pad_ct={admin_plus_pad_ct}, len={len(admin_plus_pad_ct)}")
+
+    # select email length so that the role field is on its own block (the last block)
+    required_email_len = 32 - len('email=&uid=10&role=')
+    email = 'foo@email.com'
+    print(f"required_email_len={required_email_len}, actual={len(email)}")
+    ciphertext, _ = oracle_fn(email)
     print(f"ciphertext={ciphertext.hex()}")
+    # replace last block with ciphertext for 'admin' + padded
+    modified_ct = ciphertext[:-16] + admin_plus_pad_ct
+    print(f"modified_ct={modified_ct}, len={len(modified_ct)}")
+    # unmodified profile
     decrypted_profile = decrypt_profile(ciphertext)
     print(f"decrypted_profile={decrypted_profile}")
-    # assert decrypted_profile['role'] == 'admin'
+    # hacked profile
+    decrypted_modified_profile = decrypt_profile(modified_ct)
+    print(f"decrypted_modified_profile={decrypted_modified_profile}")
+    assert decrypted_modified_profile['role'] == 'admin'
+    print(f"\n{decrypted_modified_profile['email']} is now admin!!! :-P")
 
 
 
