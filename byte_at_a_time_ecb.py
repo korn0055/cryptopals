@@ -1,18 +1,24 @@
 import aes_custom as aes
 import bit_utils
 import random, os, base64
+import functools
+
+from profiles import format_profile
 
 key = os.urandom(16)
 oracle_request_counter = 0
+random_prefix = os.urandom(random.randint(0, 16))
 
-def encryption_oracle(plaintext):
+def encryption_oracle(plaintext, use_random_prefix):
     global oracle_request_counter, key
 
     UNKNOWN_STRING = "Um9sbGluJyBpbiBteSA1LjAKV2l0aCBteSByYWctdG9wIGRvd24gc28gbXkgaGFpciBjYW4gYmxvdwpUaGUgZ2lybGllcyBvbiBzdGFuZGJ5IHdhdmluZyBqdXN0IHRvIHNheSBoaQpEaWQgeW91IHN0b3A/IE5vLCBJIGp1c3QgZHJvdmUgYnkK".encode('ascii')
+
+    prefix = random_prefix if use_random_prefix else b''
     append = base64.decodebytes(UNKNOWN_STRING)
     # check that the unknown string was copied correctly
     append.decode('ascii')
-    padded_plaintext = aes.pad_pkcs7(plaintext + append)
+    padded_plaintext = aes.pad_pkcs7(prefix + plaintext + append)
     ciphertext = aes.encrypt_ecb(padded_plaintext, key)
     oracle_request_counter += 1
     return ciphertext
@@ -24,15 +30,21 @@ def test_encryption_oracle():
         assert ct == encryption_oracle(pt)
     print("test_encryption_oracle() passed.")
 
-
-
-def determine_ecb_block_size(encryption_oracle_func, max=64):
-    for i in range(max):
-        block_size = i + 1
-        input = b'A' * 2 * block_size
+def determine_ecb_block_size(encryption_oracle_func, min_block_size=1, max_block_size=64):
+    for block_size in range(min_block_size, max_block_size):
+        # use 3 blocks to make sure there are two full blocks
+        input = os.urandom(block_size) * 3
         output = encryption_oracle_func(input)
-        if output[:block_size] == output[block_size:2*block_size]:
-            return block_size
+
+        for j in range(len(output) - 2*block_size):
+            # try different random inputs with the same size and offset to confirm match wasn't a coincidence
+            for check_number in range(10):
+                if output[j:j+block_size] == output[j+block_size:j+2*block_size]:
+                    output = encryption_oracle_func(os.urandom(block_size) * 3)
+                else:
+                    break
+            else:
+                return block_size
 
 def generate_dict(encryption_oracle_func, block_size, known_bytes = bytes()):
     d = {}
@@ -44,12 +56,10 @@ def generate_dict(encryption_oracle_func, block_size, known_bytes = bytes()):
         d[encryption_oracle_func(input)[:block_size]] = input
     return d
 
-if __name__ == "__main__":
-    # test_encryption_oracle()
-
-    block_size = determine_ecb_block_size(encryption_oracle)
+def challenge_12(encryption_oracle_func):
+    block_size = determine_ecb_block_size(encryption_oracle_func)
     print(f"block_size={block_size}")
-    unknown_string_len = len(encryption_oracle(b'A'*(block_size))) - block_size
+    unknown_string_len = len(encryption_oracle_func(b'A'*(block_size))) - block_size
     print(f"unknown_string_len={unknown_string_len}")
     known_bytes = bytes()
 
@@ -61,13 +71,13 @@ if __name__ == "__main__":
         target_input_block = b'A'*(block_size*(block_index+1)-len(known_bytes)-1)
         print(f"target_input_block={target_input_block} len={len(target_input_block)}")
         # get ciphertext block we want to match
-        ciphertext = encryption_oracle(target_input_block)
+        ciphertext = encryption_oracle_func(target_input_block)
         # last block will contain padding, so ciphertext will change
         ciphertext_to_match = ciphertext[block_index*block_size:(block_index+1)*block_size]
         # assert(len(ciphertext_to_match) >= 2*block_size)
         print(f"ciphertext_to_match={ciphertext_to_match.hex()}")
         # get the ciphertext for all values of the last byte
-        lookup = generate_dict(encryption_oracle, block_size, known_bytes)
+        lookup = generate_dict(encryption_oracle_func, block_size, known_bytes)
         # print('\n'.join([f"{k.hex()}:{v.hex()}" for k, v in lookup.items()]))
         # find which byte value generated the matching ciphertext
         matching_input = lookup.get(ciphertext_to_match, None)
@@ -79,11 +89,13 @@ if __name__ == "__main__":
         elif known_bytes:
             print('checking for padding')
             last_byte_incremented = known_bytes[:-1] + bytes([known_bytes[-1] + 1])
-            lookup = generate_dict(encryption_oracle, block_size, last_byte_incremented)
+            lookup = generate_dict(encryption_oracle_func, block_size, last_byte_incremented)
             matching_input = lookup[ciphertext_to_match]
             known_bytes = known_bytes[:-1]
             print('padding found!')
             print(f"decrypted={known_bytes}")
             break
 
+if __name__ == "__main__":
+    challenge_12(encryption_oracle_func=lambda x : encryption_oracle(x, use_random_prefix=False))
 
