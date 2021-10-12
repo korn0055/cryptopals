@@ -1,0 +1,3 @@
+detecting ecb/cbc:
+This is not as simple as looking for repeated blocks, since random values are prepended and appended.
+Important: plaintext can sent to the oracle to detect the mode. This is the whole point.
