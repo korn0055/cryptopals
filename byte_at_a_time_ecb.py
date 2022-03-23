@@ -160,6 +160,6 @@ def challenge_14(encryption_oracle_func):
 
 
 if __name__ == "__main__":
-    challenge_12(encryption_oracle_func=lambda x : encryption_oracle(x, use_random_prefix=False))
-    # challenge_14(encryption_oracle_func=lambda x : encryption_oracle(x, use_random_prefix=True))
+    # challenge_12(encryption_oracle_func=lambda x : encryption_oracle(x, use_random_prefix=False))
+    challenge_14(encryption_oracle_func=lambda x : encryption_oracle(x, use_random_prefix=True))
 

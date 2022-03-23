@@ -57,6 +57,10 @@ def test_chunkify():
     for chunk in chunks:
         print(chunk)
 
+def print_hex_block(b, width=16):
+    for chunk in chunkify(b, width):
+        print(chunk.hex())
+
 if __name__ == "__main__":
     test_bytes_xor()
     test_chunkify()

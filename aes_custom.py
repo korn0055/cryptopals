@@ -5,6 +5,9 @@ import os
 import random
 import math
 
+RANDOM_AES_KEY = os.urandom(16)
+RANDOM_CBC_IV = os.urandom(16)
+
 def load_ciphertext_from_file(path):
     with open(path, 'rb') as f:
         return base64.decodebytes(f.read())
