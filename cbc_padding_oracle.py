@@ -37,7 +37,10 @@ def find_last_byte_padding_match(ciphertext, iv, fn_check_padding):
     print("--- find_last_byte_padding_match() ---")
     assert len(ciphertext) % 16 == 0, "ciphertext must be multiple of block size (16)"
     ciphertext_buffer = bytearray(ciphertext)
+    original_ciphertext_value = ciphertext[17]
+    print(f"original_ciphertext_value={hex(original_ciphertext_value)}")
     matches = []
+    plaintext = []
     
     for b in range(255):
         # change the last byte of the second-last block
@@ -46,9 +49,35 @@ def find_last_byte_padding_match(ciphertext, iv, fn_check_padding):
         is_padding_valid = fn_check_padding(tampered_ciphertext, iv)
         if is_padding_valid:
             matches += [b]
-        print(f"b={b}\tis_padding_valid={is_padding_valid}\t{tampered_ciphertext.hex()}")
+            plaintext += [0x01 ^ b ^ original_ciphertext_value]
+        # print(f"b={hex(b)}\tis_padding_valid={is_padding_valid}\t{tampered_ciphertext.hex()}")
     
-    return matches
+    # more than one match will occur if the original ciphertext has padding, since it will match 0x01 and whatever the padding is
+    # if the value is 0x01, it will match regardless of other bytes in the block
+    # use that to figure out which match results in a plaintext of 0x01 in the last byte of the block
+    return matches, plaintext
+
+def find_second_last_byte_padding_match(ciphertext, iv, fn_check_padding, last_byte_tamper_value):
+    print("--- find_second_last_byte_padding_match() ---")
+    assert len(ciphertext) % 16 == 0, "ciphertext must be multiple of block size (16)"
+    ciphertext_buffer = bytearray(ciphertext)
+    original_ciphertext_value = ciphertext[18]
+    ciphertext_buffer[-17] = last_byte_tamper_value
+    matches = []
+    plaintext = []
+    
+    for b in range(255):
+        # change the last byte of the second-last block
+        ciphertext_buffer[-18] = b
+        tampered_ciphertext = bytes(ciphertext_buffer)
+        is_padding_valid = fn_check_padding(tampered_ciphertext, iv)
+        if is_padding_valid:
+            matches += [b]
+            plaintext += [0x01 ^ b ^ original_ciphertext_value]
+        # print(f"b={hex(b)}\tis_padding_valid={is_padding_valid}\t{tampered_ciphertext.hex()}")
+    
+    # more than one match will occur if the original ciphertext has padding, since it will match 0x01 and whatever the padding is
+    return matches, plaintext
 
 
 
@@ -58,5 +87,14 @@ if __name__ == "__main__":
     print(f"ciphertext={ciphertext.hex()}, iv={iv.hex()}")
     is_padding_valid = padding_oracle(ciphertext, iv)
     print(f"is_padding_valid={is_padding_valid}")
-    matches = find_last_byte_padding_match(ciphertext, iv, padding_oracle)
-    print(f"matches={matches}")
+    last_matches, last_plaintext = find_last_byte_padding_match(ciphertext, iv, padding_oracle)
+    print(f"{len(last_matches)} matches={','.join([hex(x) for x in last_matches])}")
+    print(f"plaintext={','.join([hex(x) for x in last_plaintext])}")
+    for last_byte_tamper_value in last_matches:
+        print(f"--- last_byte_tamper_value={last_byte_tamper_value} ---")
+        sec_last_matches, sec_last_plaintext = find_second_last_byte_padding_match(ciphertext, iv, padding_oracle, last_byte_tamper_value)
+        print(f"{len(sec_last_matches)} matches={','.join([hex(x) for x in sec_last_matches])}")
+        print(f"plaintext={','.join([hex(x) for x in sec_last_plaintext])}")
+
+
+    aes.unpad_pkcs7(bytes([14]*16))

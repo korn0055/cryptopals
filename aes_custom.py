@@ -58,6 +58,8 @@ def pad_pkcs7(bytestring, block_size=16):
 
 def unpad_pkcs7(bytestring, block_size=16):
     pad_value = bytestring[-1]
+    assert len(bytestring) % block_size == 0
+    assert pad_value <= block_size
     assert all([b == pad_value for b in bytestring[-pad_value:]])
     return bytestring[:-pad_value]
 
