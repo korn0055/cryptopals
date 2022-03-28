@@ -1,3 +1,4 @@
+from pydoc import plain
 import aes_custom as aes
 import base64
 import os
@@ -36,21 +37,33 @@ def find_last_byte_padding_match(ciphertext, iv, fn_check_padding):
 
     print("--- find_last_byte_padding_match() ---")
     assert len(ciphertext) % 16 == 0, "ciphertext must be multiple of block size (16)"
-    ciphertext_buffer = bytearray(ciphertext)
-    original_ciphertext_value = ciphertext[17]
+    original_ciphertext_value = ciphertext[-17]
     print(f"original_ciphertext_value={hex(original_ciphertext_value)}")
     matches = []
     plaintext = []
     
-    for b in range(255):
+    for tamper_value in range(255):
+        # clear any mods to other bytes
+        ciphertext_buffer = bytearray(ciphertext)
         # change the last byte of the second-last block
-        ciphertext_buffer[-17] = b
+        ciphertext_buffer[-17] = tamper_value
         tampered_ciphertext = bytes(ciphertext_buffer)
         is_padding_valid = fn_check_padding(tampered_ciphertext, iv)
         if is_padding_valid:
-            matches += [b]
-            plaintext += [0x01 ^ b ^ original_ciphertext_value]
-        # print(f"b={hex(b)}\tis_padding_valid={is_padding_valid}\t{tampered_ciphertext.hex()}")
+            print(f"tamper_value={tamper_value} has valid padding")
+            for prev_tamper_value in range(255):
+                ciphertext_buffer[-18] = prev_tamper_value
+                tampered_ciphertext = bytes(ciphertext_buffer)
+                if not fn_check_padding(tampered_ciphertext, iv):
+                    print(f"tamper_value={tamper_value} has invalid padding with prev_tamper_value={prev_tamper_value}")
+                    break
+            else:
+                print(f"tamper_value={tamper_value} has valid padding for all n-1 values")
+                matches += [tamper_value]
+                plaintext += [tamper_value ^ original_ciphertext_value ^ 0x01]
+                continue
+            break
+            
     
     # more than one match will occur if the original ciphertext has padding, since it will match 0x01 and whatever the padding is
     # if the value is 0x01, it will match regardless of other bytes in the block
@@ -60,20 +73,32 @@ def find_last_byte_padding_match(ciphertext, iv, fn_check_padding):
 def find_second_last_byte_padding_match(ciphertext, iv, fn_check_padding, last_byte_tamper_value):
     print("--- find_second_last_byte_padding_match() ---")
     assert len(ciphertext) % 16 == 0, "ciphertext must be multiple of block size (16)"
-    ciphertext_buffer = bytearray(ciphertext)
     original_ciphertext_value = ciphertext[18]
-    ciphertext_buffer[-17] = last_byte_tamper_value
     matches = []
     plaintext = []
     
-    for b in range(255):
+    for tamper_value in range(255):
+        ciphertext_buffer = bytearray(ciphertext)
+        # set plaintext of the last byte to 0x02
+        ciphertext_buffer[-17] = 0x02 ^ last_byte_tamper_value ^ 0x01
         # change the last byte of the second-last block
-        ciphertext_buffer[-18] = b
+        ciphertext_buffer[-18] = tamper_value
         tampered_ciphertext = bytes(ciphertext_buffer)
         is_padding_valid = fn_check_padding(tampered_ciphertext, iv)
         if is_padding_valid:
-            matches += [b]
-            plaintext += [0x01 ^ b ^ original_ciphertext_value]
+            print(f"tamper_value={tamper_value} has valid padding")
+            for prev_tamper_value in range(255):
+                ciphertext_buffer[-19] = prev_tamper_value
+                tampered_ciphertext = bytes(ciphertext_buffer)
+                if not fn_check_padding(tampered_ciphertext, iv):
+                    print(f"tamper_value={tamper_value} has invalid padding with prev_tamper_value={prev_tamper_value}")
+                    break
+            else:
+                print(f"tamper_value={tamper_value} has valid padding for all n-1 values")
+                matches += [tamper_value]
+                plaintext += [tamper_value ^ original_ciphertext_value ^ 0x01]
+                continue
+            break
         # print(f"b={hex(b)}\tis_padding_valid={is_padding_valid}\t{tampered_ciphertext.hex()}")
     
     # more than one match will occur if the original ciphertext has padding, since it will match 0x01 and whatever the padding is
