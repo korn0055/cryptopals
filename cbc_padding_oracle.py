@@ -1,3 +1,4 @@
+from math import floor
 from pydoc import plain
 import aes_custom as aes
 import base64
@@ -26,13 +27,54 @@ def padding_oracle(ciphertext, iv):
     except:
         return False
 
-def decrypt_block(ciphertext, iv, fn_check_padding):
-    print(f"--- decrypt_block() ---")
+def decrypt(ciphertext, iv, fn_check_padding):
+    print(f"--- decrypt() ---")
     assert len(ciphertext) % 16 == 0, "ciphertext must be multiple of block size (16)"
 
-    for i in range(16):
+    rev_iter = 0
+    tamper_values = []
+    plaintext = bytearray(len(ciphertext))
+    pre_xor_val = bytearray(len(ciphertext))
+    
+    for i in range(len(ciphertext)):
+        rev_iter += 1
+        print(f"rev_iter={rev_iter}")
         # starting with the last byte in the block, look for the tamper value that gives valid padding
-        tamper_index = -(i
+        pad_value = rev_iter % (aes.BLOCK_SIZE + 1)
+        
+        # ciphertext_buffer = bytearray(ciphertext[:-(rev_iter // aes.BLOCK_SIZE)*aes.BLOCK_SIZE])
+        ciphertext_buffer = bytearray(ciphertext)
+
+        for j in range(1, rev_iter):
+                ciphertext_buffer[-(j + aes.BLOCK_SIZE)] = pre_xor_val[-j] ^ pad_value
+                assert ciphertext_buffer[-(j + aes.BLOCK_SIZE)] ^ pre_xor_val[-j] == pad_value
+                # print(f"x={ciphertext_buffer[-(j + aes.BLOCK_SIZE)]}, j={j}, pre_xor={pre_xor_val[-j]}")
+        for tamper_value in range(255):
+            # changing this will modify plaintext at rev_iter
+            ciphertext_buffer[-(rev_iter + aes.BLOCK_SIZE)] = tamper_value
+
+            if fn_check_padding(ciphertext_buffer, iv):
+                # make sure the success padding isn't a fluke
+                for x in range(255):
+                    ciphertext_buffer[-(rev_iter + aes.BLOCK_SIZE)-1] = x
+                    if fn_check_padding(ciphertext_buffer, iv):
+                        continue
+                else:
+                    tamper_values += [tamper_value]
+                    pre_xor_val[-rev_iter] = tamper_value ^ pad_value
+                    plaintext[-rev_iter] = pre_xor_val[-rev_iter] ^ ciphertext[-(rev_iter + aes.BLOCK_SIZE)]
+                    break
+
+        else:
+            print(f"no valid padding found for ciphertext_buffer rev_iter={rev_iter}")
+            break
+
+        print(f"pre_xor_val\t={pre_xor_val.hex()}")
+        print(f"plaintext\t={plaintext.hex()}")
+        print(f"tamper_values\t={' '.join([hex(x) for x in tamper_values])}")
+        print(f"plaintext\t{plaintext[-rev_iter:].decode('ascii')}")
+
+
 
 
 
@@ -123,14 +165,12 @@ if __name__ == "__main__":
     print(f"ciphertext={ciphertext.hex()}, iv={iv.hex()}")
     is_padding_valid = padding_oracle(ciphertext, iv)
     print(f"is_padding_valid={is_padding_valid}")
-    last_matches, last_plaintext = find_last_byte_padding_match(ciphertext, iv, padding_oracle)
-    print(f"{len(last_matches)} matches={','.join([hex(x) for x in last_matches])}")
-    print(f"plaintext={','.join([hex(x) for x in last_plaintext])}")
-    for last_byte_tamper_value in last_matches:
-        print(f"--- last_byte_tamper_value={last_byte_tamper_value} ---")
-        sec_last_matches, sec_last_plaintext = find_second_last_byte_padding_match(ciphertext, iv, padding_oracle, last_byte_tamper_value)
-        print(f"{len(sec_last_matches)} matches={','.join([hex(x) for x in sec_last_matches])}")
-        print(f"plaintext={','.join([hex(x) for x in sec_last_plaintext])}")
-
-
-    aes.unpad_pkcs7(bytes([14]*16))
+    # last_matches, last_plaintext = find_last_byte_padding_match(ciphertext, iv, padding_oracle)
+    # print(f"{len(last_matches)} matches={','.join([hex(x) for x in last_matches])}")
+    # print(f"plaintext={','.join([hex(x) for x in last_plaintext])}")
+    # for last_byte_tamper_value in last_matches:
+    #     print(f"--- last_byte_tamper_value={last_byte_tamper_value} ---")
+    #     sec_last_matches, sec_last_plaintext = find_second_last_byte_padding_match(ciphertext, iv, padding_oracle, last_byte_tamper_value)
+    #     print(f"{len(sec_last_matches)} matches={','.join([hex(x) for x in sec_last_matches])}")
+    #     print(f"plaintext={','.join([hex(x) for x in sec_last_plaintext])}")
+    decrypt(ciphertext, iv, padding_oracle)

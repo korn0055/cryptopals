@@ -5,8 +5,9 @@ import os
 import random
 import math
 
-RANDOM_AES_KEY = os.urandom(16)
-RANDOM_CBC_IV = os.urandom(16)
+BLOCK_SIZE = 16
+RANDOM_AES_KEY = os.urandom(BLOCK_SIZE)
+RANDOM_CBC_IV = os.urandom(BLOCK_SIZE)
 
 def load_ciphertext_from_file(path):
     with open(path, 'rb') as f:
