@@ -29,7 +29,8 @@ def padding_oracle(ciphertext, iv):
 
 def decrypt(ciphertext, iv, fn_check_padding):
     print(f"--- decrypt() ---")
-    assert len(ciphertext) % 16 == 0, "ciphertext must be multiple of block size (16)"
+    assert len(ciphertext) == aes.BLOCK_SIZE
+    assert len(iv) == aes.BLOCK_SIZE
 
     rev_iter = 0
     tamper_values = []
@@ -40,29 +41,30 @@ def decrypt(ciphertext, iv, fn_check_padding):
         rev_iter += 1
         print(f"rev_iter={rev_iter}")
         # starting with the last byte in the block, look for the tamper value that gives valid padding
-        pad_value = rev_iter % (aes.BLOCK_SIZE + 1)
+        pad_value = rev_iter
         
         # ciphertext_buffer = bytearray(ciphertext[:-(rev_iter // aes.BLOCK_SIZE)*aes.BLOCK_SIZE])
-        ciphertext_buffer = bytearray(ciphertext)
+        iv_buffer = bytearray(ciphertext)
 
         for j in range(1, rev_iter):
-                ciphertext_buffer[-(j + aes.BLOCK_SIZE)] = pre_xor_val[-j] ^ pad_value
-                assert ciphertext_buffer[-(j + aes.BLOCK_SIZE)] ^ pre_xor_val[-j] == pad_value
+                iv_buffer[-j] = pre_xor_val[-j] ^ pad_value
+                assert iv_buffer[-j] ^ pre_xor_val[-j] == pad_value
                 # print(f"x={ciphertext_buffer[-(j + aes.BLOCK_SIZE)]}, j={j}, pre_xor={pre_xor_val[-j]}")
         for tamper_value in range(255):
             # changing this will modify plaintext at rev_iter
-            ciphertext_buffer[-(rev_iter + aes.BLOCK_SIZE)] = tamper_value
+            iv_buffer[-rev_iter] = tamper_value
 
-            if fn_check_padding(ciphertext_buffer, iv):
+            if fn_check_padding(ciphertext, iv_buffer):
                 # make sure the success padding isn't a fluke
+                # this needs some tweaks
                 for x in range(255):
-                    ciphertext_buffer[-(rev_iter + aes.BLOCK_SIZE)-1] = x
-                    if fn_check_padding(ciphertext_buffer, iv):
+                    iv_buffer[-(rev_iter+1)] = x
+                    if fn_check_padding(ciphertext, iv_buffer):
                         continue
                 else:
                     tamper_values += [tamper_value]
                     pre_xor_val[-rev_iter] = tamper_value ^ pad_value
-                    plaintext[-rev_iter] = pre_xor_val[-rev_iter] ^ ciphertext[-(rev_iter + aes.BLOCK_SIZE)]
+                    plaintext[-rev_iter] = pre_xor_val[-rev_iter] ^ iv[-(rev_iter)]
                     break
 
         else:
@@ -173,4 +175,5 @@ if __name__ == "__main__":
     #     sec_last_matches, sec_last_plaintext = find_second_last_byte_padding_match(ciphertext, iv, padding_oracle, last_byte_tamper_value)
     #     print(f"{len(sec_last_matches)} matches={','.join([hex(x) for x in sec_last_matches])}")
     #     print(f"plaintext={','.join([hex(x) for x in sec_last_plaintext])}")
-    decrypt(ciphertext, iv, padding_oracle)
+    iv = ciphertext[-aes.BLOCK_SIZE*2:-aes.BLOCK_SIZE]
+    decrypt(ciphertext[-aes.BLOCK_SIZE:], iv, padding_oracle)
