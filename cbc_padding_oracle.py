@@ -26,6 +26,17 @@ def padding_oracle(ciphertext, iv):
     except:
         return False
 
+def decrypt_block(ciphertext, iv, fn_check_padding):
+    print(f"--- decrypt_block() ---")
+    assert len(ciphertext) % 16 == 0, "ciphertext must be multiple of block size (16)"
+
+    for i in range(16):
+        # starting with the last byte in the block, look for the tamper value that gives valid padding
+        tamper_index = -(i
+
+
+
+
 def find_last_byte_padding_match(ciphertext, iv, fn_check_padding):
     # a single last by of 0x01 is valid padding
     # in CBC mode, the plaintext is XOR-ed with the previous cipher block,
