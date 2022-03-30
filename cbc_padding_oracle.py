@@ -56,12 +56,8 @@ def decrypt_block(ciphertext, iv, fn_check_padding, print_debug=False):
             if fn_check_padding(ciphertext, iv_buffer):
                 if pad_value < 16:
                     # make sure the successful padding isn't a fluke
-                    for x in range(256):
-                        iv_buffer[-(pad_value+1)] = x
-                        if not fn_check_padding(ciphertext, iv_buffer):
-                            break
-                    else:
-                        tamper_value_is_good = True
+                    iv_buffer[-(pad_value+1)] = pad_value + 1
+                    tamper_value_is_good = fn_check_padding(ciphertext, iv_buffer)
                 else:
                     tamper_value_is_good = True
 
@@ -70,6 +66,8 @@ def decrypt_block(ciphertext, iv, fn_check_padding, print_debug=False):
                     pre_xor_val[-pad_value] = tamper_value ^ pad_value
                     plaintext[-pad_value] = pre_xor_val[-pad_value] ^ iv[-(pad_value)]
                     break
+                else:
+                    print(f"pad_value={pad_value} tamper_value={tamper_value} failed secondary check")
 
         else:
             print(f"no valid padding found for ciphertext_buffer pad_value={pad_value}")
