@@ -1,5 +1,4 @@
-from math import floor
-from pydoc import plain
+from tokenize import PlainToken
 import aes_custom as aes
 import base64
 import os
@@ -50,17 +49,26 @@ def decrypt(ciphertext, iv, fn_check_padding):
                 iv_buffer[-j] = pre_xor_val[-j] ^ pad_value
                 assert iv_buffer[-j] ^ pre_xor_val[-j] == pad_value
                 # print(f"x={ciphertext_buffer[-(j + aes.BLOCK_SIZE)]}, j={j}, pre_xor={pre_xor_val[-j]}")
-        for tamper_value in range(255):
+        for tamper_value in range(256):
             # changing this will modify plaintext at rev_iter
             iv_buffer[-rev_iter] = tamper_value
 
             if fn_check_padding(ciphertext, iv_buffer):
                 # make sure the success padding isn't a fluke
                 # this needs some tweaks
-                for x in range(255):
-                    iv_buffer[-(rev_iter+1)] = x
-                    if fn_check_padding(ciphertext, iv_buffer):
-                        continue
+                if rev_iter < 16:
+                    pass
+
+                if rev_iter < 16:
+                    for x in range(256):
+                        iv_buffer[-(rev_iter+1)] = x
+                        if fn_check_padding(ciphertext, iv_buffer):
+                            continue
+                    else:
+                        tamper_values += [tamper_value]
+                        pre_xor_val[-rev_iter] = tamper_value ^ pad_value
+                        plaintext[-rev_iter] = pre_xor_val[-rev_iter] ^ iv[-(rev_iter)]
+                        break
                 else:
                     tamper_values += [tamper_value]
                     pre_xor_val[-rev_iter] = tamper_value ^ pad_value
@@ -75,6 +83,8 @@ def decrypt(ciphertext, iv, fn_check_padding):
         print(f"plaintext\t={plaintext.hex()}")
         print(f"tamper_values\t={' '.join([hex(x) for x in tamper_values])}")
         print(f"plaintext\t{plaintext[-rev_iter:].decode('ascii')}")
+    
+    return bytes(plaintext)
 
 
 
@@ -175,5 +185,21 @@ if __name__ == "__main__":
     #     sec_last_matches, sec_last_plaintext = find_second_last_byte_padding_match(ciphertext, iv, padding_oracle, last_byte_tamper_value)
     #     print(f"{len(sec_last_matches)} matches={','.join([hex(x) for x in sec_last_matches])}")
     #     print(f"plaintext={','.join([hex(x) for x in sec_last_plaintext])}")
-    iv = ciphertext[-aes.BLOCK_SIZE*2:-aes.BLOCK_SIZE]
-    decrypt(ciphertext[-aes.BLOCK_SIZE:], iv, padding_oracle)
+
+    iv_and_ciphertext = iv + ciphertext
+    print(f"iv_and_ciphertext\t={len(iv_and_ciphertext)}")
+    block_ciphertext = iv_and_ciphertext[-aes.BLOCK_SIZE:]
+    print(f"block_ciphertext\t={block_ciphertext.hex()}")
+    iv_and_ciphertext = iv_and_ciphertext[:-aes.BLOCK_SIZE]
+    print(f"iv_and_ciphertext\t={len(iv_and_ciphertext)}")
+    plaintext = bytes()
+    while iv_and_ciphertext:
+        block_iv = iv_and_ciphertext[-aes.BLOCK_SIZE:]
+        iv_and_ciphertext = iv_and_ciphertext[:-aes.BLOCK_SIZE]
+        print(f"block_iv\t={block_iv.hex()}")
+        print(f"block_ciphertext={block_ciphertext.hex()}")
+        plaintext = decrypt(block_ciphertext, block_iv, padding_oracle) + plaintext
+        block_ciphertext = block_iv
+
+    print(f"plaintext=\t{plaintext.hex()}")
+    print(f"plaintext=\t{plaintext.decode('ascii')}")    
