@@ -5,14 +5,17 @@ import os
 import random
 import bit_utils
 
-def get_random_encrypted_line():
+def get_random_encrypted_line(index=None):
     iv = os.urandom(16)
     # key is created once
     fixed_key = aes.RANDOM_AES_KEY
 
     with open("set3challenge17.txt", 'rb') as f:
         lines = f.readlines()
-        random_line = random.choice(lines)
+        if index:
+            random_line = lines[index]
+        else:
+            random_line = random.choice(lines)
         plaintext = base64.decodebytes(random_line)
         padded_plaintext = aes.pad_pkcs7(plaintext)
         encrypted = aes.encrypt_cbc(padded_plaintext, fixed_key, iv)
@@ -26,8 +29,9 @@ def padding_oracle(ciphertext, iv):
     except:
         return False
 
-def decrypt_block(ciphertext, iv, fn_check_padding):
-    print(f"decrypt_block(): iv={iv.hex()}, ciphertext={ciphertext.hex()}")
+def decrypt_block(ciphertext, iv, fn_check_padding, print_debug=False):
+    if print_debug:
+        print(f"decrypt_block(): iv={iv.hex()}, ciphertext={ciphertext.hex()}")
     assert len(ciphertext) == aes.BLOCK_SIZE
     assert len(iv) == aes.BLOCK_SIZE
 
@@ -71,10 +75,11 @@ def decrypt_block(ciphertext, iv, fn_check_padding):
             print(f"no valid padding found for ciphertext_buffer pad_value={pad_value}")
             break
 
-        # print(f"pre_xor_val\t={pre_xor_val.hex()}")
-        # print(f"plaintext\t={plaintext.hex()}")
-        # print(f"tamper_values\t={' '.join([hex(x) for x in tamper_values])}")
-        # print(f"plaintext\t{plaintext[-pad_value:].decode('ascii')}")
+        if print_debug:
+            print(f"pre_xor_val\t={pre_xor_val.hex()}")
+            print(f"plaintext\t={plaintext.hex()}")
+            print(f"tamper_values\t={' '.join([hex(x) for x in tamper_values])}")
+            print(f"plaintext\t{plaintext[-pad_value:].decode('ascii')}")
     
     return bytes(plaintext)
 
@@ -165,27 +170,19 @@ def find_second_last_byte_padding_match(ciphertext, iv, fn_check_padding, last_b
 
 if __name__ == "__main__":
     print("set3, challenge 17 - CBC Padding Oracle")
-    ciphertext, iv = get_random_encrypted_line()
-    print(f"ciphertext={ciphertext.hex()}, iv={iv.hex()}")
-    is_padding_valid = padding_oracle(ciphertext, iv)
-    print(f"is_padding_valid={is_padding_valid}")
-    # last_matches, last_plaintext = find_last_byte_padding_match(ciphertext, iv, padding_oracle)
-    # print(f"{len(last_matches)} matches={','.join([hex(x) for x in last_matches])}")
-    # print(f"plaintext={','.join([hex(x) for x in last_plaintext])}")
-    # for last_byte_tamper_value in last_matches:
-    #     print(f"--- last_byte_tamper_value={last_byte_tamper_value} ---")
-    #     sec_last_matches, sec_last_plaintext = find_second_last_byte_padding_match(ciphertext, iv, padding_oracle, last_byte_tamper_value)
-    #     print(f"{len(sec_last_matches)} matches={','.join([hex(x) for x in sec_last_matches])}")
-    #     print(f"plaintext={','.join([hex(x) for x in sec_last_plaintext])}")
+    for i in range(10):
+        ciphertext, iv = get_random_encrypted_line(index=i)
+        print(f"ciphertext={ciphertext.hex()}, iv={iv.hex()}")
+        is_padding_valid = padding_oracle(ciphertext, iv)
+        print(f"is_padding_valid={is_padding_valid}")
+        blocks_reversed = bit_utils.chunkify(iv + ciphertext, -aes.BLOCK_SIZE)
+        block_ciphertext = next(blocks_reversed)
+        plaintext = bytes()
+        for block in blocks_reversed:
+            block_iv = block
+            plaintext = decrypt_block(block_ciphertext, block_iv, padding_oracle) + plaintext
+            block_ciphertext = block_iv
 
-    blocks_reversed = bit_utils.chunkify(iv + ciphertext, -aes.BLOCK_SIZE)
-    block_ciphertext = next(blocks_reversed)
-    plaintext = bytes()
-    for block in blocks_reversed:
-        block_iv = block
-        plaintext = decrypt_block(block_ciphertext, block_iv, padding_oracle) + plaintext
-        block_ciphertext = block_iv
-
-    assert len(plaintext) == len(ciphertext)
-    print(f"plaintext=\t{plaintext.hex()}")
-    print(f"plaintext=\t{plaintext.decode('ascii')}")    
+        assert len(plaintext) == len(ciphertext)
+        print(f"plaintext=\t{plaintext.hex()}")
+        print(f"plaintext=\t{plaintext.decode('ascii')}\n")
