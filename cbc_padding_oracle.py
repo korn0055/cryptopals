@@ -26,63 +26,55 @@ def padding_oracle(ciphertext, iv):
     except:
         return False
 
-def decrypt(ciphertext, iv, fn_check_padding):
-    print(f"--- decrypt() ---")
+def decrypt_block(ciphertext, iv, fn_check_padding):
+    print(f"decrypt_block(): iv={iv.hex()}, ciphertext={ciphertext.hex()}")
     assert len(ciphertext) == aes.BLOCK_SIZE
     assert len(iv) == aes.BLOCK_SIZE
 
-    rev_iter = 0
+    pad_value = 0
     tamper_values = []
     plaintext = bytearray(len(ciphertext))
     pre_xor_val = bytearray(len(ciphertext))
     
-    for i in range(len(ciphertext)):
-        rev_iter += 1
-        print(f"rev_iter={rev_iter}")
+    for pad_value in range(1, aes.BLOCK_SIZE+1):
+        # print(f"pad_value={pad_value}")
         # starting with the last byte in the block, look for the tamper value that gives valid padding
-        pad_value = rev_iter
-        
-        # ciphertext_buffer = bytearray(ciphertext[:-(rev_iter // aes.BLOCK_SIZE)*aes.BLOCK_SIZE])
         iv_buffer = bytearray(ciphertext)
 
-        for j in range(1, rev_iter):
-                iv_buffer[-j] = pre_xor_val[-j] ^ pad_value
-                assert iv_buffer[-j] ^ pre_xor_val[-j] == pad_value
-                # print(f"x={ciphertext_buffer[-(j + aes.BLOCK_SIZE)]}, j={j}, pre_xor={pre_xor_val[-j]}")
+        for j in range(1, pad_value):
+            iv_buffer[-j] = pre_xor_val[-j] ^ pad_value
+
         for tamper_value in range(256):
-            # changing this will modify plaintext at rev_iter
-            iv_buffer[-rev_iter] = tamper_value
+            # changing this will modify plaintext at index -pad_value
+            iv_buffer[-pad_value] = tamper_value
 
+            tamper_value_is_good = False
             if fn_check_padding(ciphertext, iv_buffer):
-                # make sure the success padding isn't a fluke
-                # this needs some tweaks
-                if rev_iter < 16:
-                    pass
-
-                if rev_iter < 16:
+                if pad_value < 16:
+                    # make sure the successful padding isn't a fluke
                     for x in range(256):
-                        iv_buffer[-(rev_iter+1)] = x
-                        if fn_check_padding(ciphertext, iv_buffer):
-                            continue
+                        iv_buffer[-(pad_value+1)] = x
+                        if not fn_check_padding(ciphertext, iv_buffer):
+                            break
                     else:
-                        tamper_values += [tamper_value]
-                        pre_xor_val[-rev_iter] = tamper_value ^ pad_value
-                        plaintext[-rev_iter] = pre_xor_val[-rev_iter] ^ iv[-(rev_iter)]
-                        break
+                        tamper_value_is_good = True
                 else:
+                    tamper_value_is_good = True
+
+                if tamper_value_is_good:
                     tamper_values += [tamper_value]
-                    pre_xor_val[-rev_iter] = tamper_value ^ pad_value
-                    plaintext[-rev_iter] = pre_xor_val[-rev_iter] ^ iv[-(rev_iter)]
+                    pre_xor_val[-pad_value] = tamper_value ^ pad_value
+                    plaintext[-pad_value] = pre_xor_val[-pad_value] ^ iv[-(pad_value)]
                     break
 
         else:
-            print(f"no valid padding found for ciphertext_buffer rev_iter={rev_iter}")
+            print(f"no valid padding found for ciphertext_buffer pad_value={pad_value}")
             break
 
-        print(f"pre_xor_val\t={pre_xor_val.hex()}")
-        print(f"plaintext\t={plaintext.hex()}")
-        print(f"tamper_values\t={' '.join([hex(x) for x in tamper_values])}")
-        print(f"plaintext\t{plaintext[-rev_iter:].decode('ascii')}")
+        # print(f"pre_xor_val\t={pre_xor_val.hex()}")
+        # print(f"plaintext\t={plaintext.hex()}")
+        # print(f"tamper_values\t={' '.join([hex(x) for x in tamper_values])}")
+        # print(f"plaintext\t{plaintext[-pad_value:].decode('ascii')}")
     
     return bytes(plaintext)
 
@@ -186,20 +178,14 @@ if __name__ == "__main__":
     #     print(f"{len(sec_last_matches)} matches={','.join([hex(x) for x in sec_last_matches])}")
     #     print(f"plaintext={','.join([hex(x) for x in sec_last_plaintext])}")
 
-    iv_and_ciphertext = iv + ciphertext
-    print(f"iv_and_ciphertext\t={len(iv_and_ciphertext)}")
-    block_ciphertext = iv_and_ciphertext[-aes.BLOCK_SIZE:]
-    print(f"block_ciphertext\t={block_ciphertext.hex()}")
-    iv_and_ciphertext = iv_and_ciphertext[:-aes.BLOCK_SIZE]
-    print(f"iv_and_ciphertext\t={len(iv_and_ciphertext)}")
+    blocks_reversed = bit_utils.chunkify(iv + ciphertext, -aes.BLOCK_SIZE)
+    block_ciphertext = next(blocks_reversed)
     plaintext = bytes()
-    while iv_and_ciphertext:
-        block_iv = iv_and_ciphertext[-aes.BLOCK_SIZE:]
-        iv_and_ciphertext = iv_and_ciphertext[:-aes.BLOCK_SIZE]
-        print(f"block_iv\t={block_iv.hex()}")
-        print(f"block_ciphertext={block_ciphertext.hex()}")
-        plaintext = decrypt(block_ciphertext, block_iv, padding_oracle) + plaintext
+    for block in blocks_reversed:
+        block_iv = block
+        plaintext = decrypt_block(block_ciphertext, block_iv, padding_oracle) + plaintext
         block_ciphertext = block_iv
 
+    assert len(plaintext) == len(ciphertext)
     print(f"plaintext=\t{plaintext.hex()}")
     print(f"plaintext=\t{plaintext.decode('ascii')}")    

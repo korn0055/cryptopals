@@ -29,8 +29,14 @@ def test_hamming_distance():
 
 def chunkify(iterable, size):
     while iterable:
-        yield iterable[:size]
-        iterable = iterable[size:]
+        if size < 0:
+            # backwards
+            yield iterable[size:]
+            iterable = iterable[:size]
+        else:
+            # forwards
+            yield iterable[:size]
+            iterable = iterable[size:]
 
 def bytes_xor(x : bytes, y : bytes):
     # assert isinstance(x, bytes)
