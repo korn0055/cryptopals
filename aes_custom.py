@@ -4,6 +4,7 @@ import bit_utils
 import os
 import random
 import math
+import itertools
 
 BLOCK_SIZE = 16
 RANDOM_AES_KEY = os.urandom(BLOCK_SIZE)
@@ -167,14 +168,48 @@ def test_detect_oracle_mode(verbose=False):
         summary[actual_mode] += 1
         assert detected_mode == actual_mode
     print(f"test_detect_oracle_mode() passed {pass_count} of {TEST_TRIALS} test trials. Actual mode counts={summary}")
+
+# CTR is essentially a stream cipher, so encrypt and decrypt are the same function
+def encrypt_ctr(plaintext, key, nonce):
+    if isinstance(nonce, int):
+        nonce = nonce.to_bytes(8, 'little')
+
+    assert len(nonce) == 8
+    keystream = b''
+    # generate keystream
+    for counter_val in range(math.ceil(len(plaintext) / BLOCK_SIZE)):
+        keystream_input = nonce + counter_val.to_bytes(8, 'little')
+        keystream += encrypt_ecb(keystream_input, key)
+        print(f"keystream_input={keystream_input}")
+
+    ciphertext = bit_utils.bytes_xor(plaintext, keystream)
+    return ciphertext
+
+
+
+def test_ctr():
+    key ="YELLOW SUBMARINE".encode('ascii')
+    plaintext = "HELLO THERe here's eom stuff to encrypt -doens't need to be a multple of a block  Typos are cool 2.".encode('ascii')
+    ciphertext = encrypt_ctr(plaintext=plaintext, key=key, nonce=bytes.fromhex('aabbccddeeff1122'))
+    decrypted = encrypt_ctr(plaintext=ciphertext, key=key, nonce=bytes.fromhex('aabbccddeeff1122'))
+    print(f"ciphertext={ciphertext}")
+    assert decrypted == plaintext
+
+def set3_challenge18():
+    key ="YELLOW SUBMARINE".encode('ascii')
+    ciphertext = base64.decodebytes("L77na/nrFsKvynd6HzOoG7GHTLXsTVu9qvY/2syLXzhPweyyMTJULu/6/kXX0KSvoOLSFQ==".encode("ascii"))
+    decrypted = encrypt_ctr(plaintext=ciphertext, key=key, nonce=0)
+    print(decrypted.decode('ascii'))
    
 
 if __name__ == "__main__":
-    test_ecb1()
-    test_ecb2()
-    test_pad_pkcs7()
-    test_cbc()
+    # test_ecb1()
+    # test_ecb2()
+    # test_pad_pkcs7()
+    # test_cbc()
     # set2challenge10()
     # test_unpad_pkcs7()
     # print(encryption_oracle("some bla bla bla to encrypt".encode('ascii')))
-    test_detect_oracle_mode()
+    # test_detect_oracle_mode()
+    # test_ctr()
+    set3_challenge18()
