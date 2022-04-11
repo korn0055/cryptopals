@@ -180,7 +180,7 @@ def encrypt_ctr(plaintext, key, nonce):
     for counter_val in range(math.ceil(len(plaintext) / BLOCK_SIZE)):
         keystream_input = nonce + counter_val.to_bytes(8, 'little')
         keystream += encrypt_ecb(keystream_input, key)
-        print(f"keystream_input={keystream_input}")
+        # print(f"keystream_input={keystream_input}")
 
     ciphertext = bit_utils.bytes_xor(plaintext, keystream)
     return ciphertext
