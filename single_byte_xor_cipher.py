@@ -45,6 +45,21 @@ english_text_distribution = {
     # '#' : -10,
     # '*' : -10
     #  t a o i n s r h l d c u m g f p w y b , . v k ' " - x 0 j 1 q 2 z ) ( : ! ? 5 ; 3 4 9 / 8 6 7 [ ] % $ | * = _ + > \ < & ^ # @ ` ~ { }]
+    'that' : 100,
+    'ther' : 100,
+    'with' : 100,
+    'tion' : 100,
+
+    'the' : 50,
+    'and' : 50,
+    'ing' : 50,
+    'her' : 50,
+    'hat' : 50,
+
+    'th' : 20,
+    'he' : 20,
+    'in' : 20,
+    'er' : 20,
 
 }
 
@@ -58,14 +73,19 @@ def create_score_values():
 
 def calc_score(text : bytes, scoringValues = create_score_values()):
     assert isinstance(text, bytes)
-    return sum([scoringValues.get(bytes([ch]), 0) for ch in text])
+    # letter_score = sum([scoringValues.get(bytes([ch]), 0) for ch in text])
+    # multigram_score = sum([ v*text.count(k.encode('ascii')) for k, v in multigram_scores.items()])
+    # return letter_score + multigram_score
+    return sum([ v*text.count(k) for k, v in scoringValues.items()])
     
-def score_over_keyspace(ciphertext : bytes, return_dict=False):
+
+    
+def score_over_keyspace(ciphertext : bytes, return_dict=False, decrypt_func=decrypt):
     scores = []
     scores_dict = {}
     for key in range(256):
         score = 0
-        decrypted = decrypt(ciphertext, key)
+        decrypted = decrypt_func(ciphertext, key)
         score = calc_score(decrypted)
         scores.append(score)
         scores_dict[key] = score
