@@ -45,21 +45,23 @@ english_text_distribution = {
     # '#' : -10,
     # '*' : -10
     #  t a o i n s r h l d c u m g f p w y b , . v k ' " - x 0 j 1 q 2 z ) ( : ! ? 5 ; 3 4 9 / 8 6 7 [ ] % $ | * = _ + > \ < & ^ # @ ` ~ { }]
-    'that' : 100,
-    'ther' : 100,
-    'with' : 100,
-    'tion' : 100,
+    
+    ### multi-grams only make sense if text is in order, but so far scoring is done with sliced up ciphertext
+    # 'that' : 100,
+    # 'ther' : 100,
+    # 'with' : 100,
+    # 'tion' : 100,
 
-    'the' : 50,
-    'and' : 50,
-    'ing' : 50,
-    'her' : 50,
-    'hat' : 50,
+    # 'the' : 50,
+    # 'and' : 50,
+    # 'ing' : 50,
+    # 'her' : 50,
+    # 'hat' : 50,
 
-    'th' : 20,
-    'he' : 20,
-    'in' : 20,
-    'er' : 20,
+    # 'th' : 20,
+    # 'he' : 20,
+    # 'in' : 20,
+    # 'er' : 20,
 
 }
 

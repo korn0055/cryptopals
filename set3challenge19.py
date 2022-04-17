@@ -19,9 +19,7 @@ def test_vertical_slices():
     for s, t in zip(slices, trimmed):
         print(f"slice={s}")
         print(f"trim ={[v for v in s if v is not None]}")
-        print(f"trim2={t}")
-
-    
+        print(f"trim2={t}")   
 
 # we know that each line of the ciphertext is is encrypted with CTR mode and uses the same nonce
 # this means the keystream byte that is xor-ed with the plaintext is the same for each "column"
@@ -56,6 +54,10 @@ if __name__ == "__main__":
     # print(f"keys_by_slice={keys_by_slice}")
     keystream = bytes(list(zip(*keys_by_slice))[0])
     print(f"keystream={keystream}")
-    for line in ct:
-        plaintext = bit_utils.bytes_xor(line, keystream)
-        print(plaintext.decode('ascii'))
+    with open('set3challenge19_out.txt', 'w') as f:
+        for line in ct:
+            plaintext_bytes = bit_utils.bytes_xor(line, keystream)
+            plaintext_ascii = plaintext_bytes.decode('ascii')
+            print(plaintext_ascii)
+            f.writelines(plaintext_ascii)
+        
