@@ -8,14 +8,20 @@ import itertools
 # just some sanity checking to make sure things are being sliced correctly
 def test_vertical_slices():
     test_vals = ["ABCDEFGHIJKLMNOPQRSTUVWXYZ"[:random.randint(6,27)] for i in range(10)]
-    print(test_vals)
+    print('\n'.join([x for x in test_vals]))
 
     max_len = max(map(len, test_vals))
     print(f"max_len={max_len}")
     # the output of standard zip is only as long as the shortest input, zip_longest pads with None
     slices = list(itertools.zip_longest(*test_vals))
-    for s in slices:
+    trimmed = [ [v for v in slice if v is not None] for slice in slices]
+
+    for s, t in zip(slices, trimmed):
         print(f"slice={s}")
+        print(f"trim ={[v for v in s if v is not None]}")
+        print(f"trim2={t}")
+
+    
 
 # we know that each line of the ciphertext is is encrypted with CTR mode and uses the same nonce
 # this means the keystream byte that is xor-ed with the plaintext is the same for each "column"
@@ -23,7 +29,8 @@ def test_vertical_slices():
 # the rows not being the same lenght makes it a little trickier - some may not have enough ciphertext
 # for frequency analysis to be useful
 if __name__ == "__main__":
-    test_vertical_slices()
+    # test_vertical_slices()
+
     ct = []
     with open('set3challenge19_ct.txt', 'rb') as f:
         for line in f:
@@ -33,12 +40,14 @@ if __name__ == "__main__":
     
     # slice the ciphertexts by keystream position/counter value
     keys_by_slice = []
-    slices = list(zip(*ct))
-    # print(slices)
-    for slice in slices:
+    slices = list(itertools.zip_longest(*ct))
+    # remove None values
+    slices = [ [v for v in slice if v is not None] for slice in slices]
+    for i, slice in enumerate(slices):
+        print(f"i={i}\tlen_slice={len(slice)}")
+        print(slice)
         # try all key values and calculate a score
         slice_bytes = bytes(slice)
-        print(f"len_slice_bytes={len(slice_bytes)}")
         # print(f"slice={slice_bytes.hex()}")
         scores = score_over_keyspace(slice_bytes, return_dict=True)
         # print(f"scores={sorted(scores, key=scores.get, reverse=True)}")
