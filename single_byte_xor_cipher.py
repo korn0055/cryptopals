@@ -1,7 +1,7 @@
 from collections import Counter
 import string
 import binascii
-from bit_utils import bytes_xor
+from bit_utils import bytes_xor, hamming_distance
 import itertools
 
 def decrypt(ciphertext : bytes, key : bytes):
@@ -82,13 +82,22 @@ def calc_score(text : bytes, scoringValues = create_score_values()):
     
 
     
-def score_over_keyspace(ciphertext : bytes, return_dict=False, decrypt_func=decrypt):
+def score_over_keyspace(ciphertext : bytes, return_dict=False, decrypt_func=decrypt, hint_plaintext : bytes=None):
     scores = []
     scores_dict = {}
     for key in range(256):
         score = 0
         decrypted = decrypt_func(ciphertext, key)
         score = calc_score(decrypted)
+        if hint_plaintext is not None and len(hint_plaintext) >= 1 and hint_plaintext in decrypted:
+            print(f"hint found:{hint_plaintext}, key={hex(key)}")
+            score += len(hint_plaintext) * 100
+        # elif hint_plaintext is not None:
+        #     bonus = (hamming_distance(hint_plaintext, decrypted[:len(hint_plaintext)]) // 8) * 10
+        #     print(f"hint bonus:{bonus}")
+        #     score += bonus
+
+            
         scores.append(score)
         scores_dict[key] = score
     
